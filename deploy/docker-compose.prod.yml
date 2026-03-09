@@ -1,9 +1,6 @@
 services:
   app:
-    build:
-      context: ${PROJECT_ROOT}
-      dockerfile: Dockerfile
-    image: we-mp-rss:prod
+    image: ${WERSS_IMAGE}
     container_name: we-mp-rss-app
     restart: unless-stopped
     ports:

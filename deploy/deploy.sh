@@ -10,7 +10,6 @@ if [[ ! -f "${ENV_FILE}" ]]; then
   exit 1
 fi
 
-"${SCRIPT_DIR}/build-frontend.sh"
-
-docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" up -d --build
+docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" pull
+docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" up -d
 docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" ps

@@ -1,13 +1,13 @@
-# Ubuntu 源码部署指南
+# Ubuntu 部署指南
 
-本文档适用于仓库位于 `/projects/we-mp-rss` 的单机 Ubuntu 部署。
+本文档适用于仓库位于 `/projects/we-mp-rss` 的单机 Ubuntu 部署，默认使用项目官方代理镜像，不在服务器本地构建前端或 Docker 镜像。
 
 ## 架构
 
 - Nginx 对外提供 `80/443`
 - 应用容器监听 `127.0.0.1:8001`
 - 默认使用项目原生 SQLite，数据库文件保存在 `runtime/data`
-- 前端生产构建产物复制到仓库根目录 `static/`
+- 应用镜像默认使用 `docker.1ms.run/rachelos/we-mp-rss:latest`
 
 ## 前置条件
 
@@ -21,11 +21,11 @@
 
 ```bash
 sudo apt update
-sudo apt install -y ca-certificates curl gnupg nginx snapd
+sudo apt install -y ca-certificates curl gnupg nginx certbot python3-certbot-nginx
 sudo install -m 0755 -d /etc/apt/keyrings
-sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
-sudo chmod a+r /etc/apt/keyrings/docker.asc
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+curl -fsSL https://mirrors.ustc.edu.cn/docker-ce/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+sudo chmod a+r /etc/apt/keyrings/docker.gpg
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://mirrors.ustc.edu.cn/docker-ce/linux/ubuntu $(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}") stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 sudo apt update
 sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
 ```
@@ -51,6 +51,10 @@ cp deploy/.env.example deploy/.env.prod
 - `ADMIN_PASSWORD`
 - `SECRET_KEY`
 
+默认镜像地址已经配置为国内代理：
+
+- `WERSS_IMAGE=docker.1ms.run/rachelos/we-mp-rss:latest`
+
 3. 执行部署
 
 ```bash
@@ -58,6 +62,13 @@ cd /projects/we-mp-rss
 chmod +x deploy/*.sh
 ./deploy/deploy.sh
 ```
+
+部署脚本执行的是：
+
+- `docker compose pull`
+- `docker compose up -d`
+
+不会在服务器本地构建前端，也不会拉取 `node:20`。
 
 4. 检查应用
 
@@ -90,10 +101,6 @@ sudo systemctl reload nginx
 ## HTTPS
 
 ```bash
-sudo snap install core
-sudo snap refresh core
-sudo snap install --classic certbot
-sudo ln -sf /snap/bin/certbot /usr/bin/certbot
 sudo certbot --nginx -d your-domain.example.com
 ```
 
@@ -120,14 +127,15 @@ cd /projects/we-mp-rss
 
 ## 常见问题
 
-### 前端页面未更新
+### 国内云主机拉镜像慢或失败
 
-重新执行：
+先单独测试代理镜像：
 
 ```bash
-cd /projects/we-mp-rss
-./deploy/build-frontend.sh
+docker pull docker.1ms.run/rachelos/we-mp-rss:latest
 ```
+
+如果代理镜像可拉取，`./deploy/deploy.sh` 就不需要本地构建。
 
 ### 管理员账号没有变化
 
@@ -143,4 +151,13 @@ cd /projects/we-mp-rss
 
 ### 浏览器采集异常
 
-默认使用 `webkit`。如果运行环境缺少浏览器依赖，先检查基础镜像是否可正常构建，再查看应用日志。
+默认使用 `webkit`。如果运行环境缺少浏览器依赖或应用启动异常，直接查看容器日志：
+
+```bash
+cd /projects/we-mp-rss/deploy
+docker compose --env-file .env.prod -f docker-compose.prod.yml logs -f app
+```
+
+## 可选方案
+
+如果你的服务器能稳定访问 Docker Hub 和 GitHub Container Registry，且你确实需要基于本地源码自定义构建，再使用 `deploy/build-frontend.sh` 和项目根目录 Dockerfile。国内云主机默认不推荐这条路径。
