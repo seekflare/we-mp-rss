@@ -23,3 +23,6 @@ test.yaml
 .venv
 .idea
 .trae
+runtime/
+backups/
+deploy/.env.prod
