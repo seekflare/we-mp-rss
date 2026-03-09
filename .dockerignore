@@ -1,7 +1,9 @@
 data/
-web_ui/
 Dockerfile/
 node_modules/
+web_ui/node_modules/
+web_ui/dist/
+web_ui/.vite/
 scripts/
 compose/
 fonts/
@@ -9,3 +11,6 @@ fonts/
 .github/
 _pycache_/
 db.db
+runtime/
+deploy/.env.prod
+deploy/.env.prod.*

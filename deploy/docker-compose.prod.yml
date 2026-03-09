@@ -1,6 +1,13 @@
 services:
   app:
-    image: ${WERSS_IMAGE}
+    image: ${WERSS_LOCAL_IMAGE}
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        DOCKERHUB_MIRROR: ${DOCKERHUB_MIRROR}
+        GHCR_MIRROR: ${GHCR_MIRROR}
+        NPM_REGISTRY: ${NPM_REGISTRY}
     container_name: we-mp-rss-app
     restart: unless-stopped
     ports:

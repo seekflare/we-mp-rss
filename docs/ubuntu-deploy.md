@@ -1,13 +1,13 @@
 # Ubuntu 部署指南
 
-本文档适用于仓库位于 `/projects/we-mp-rss` 的单机 Ubuntu 部署，默认使用项目官方代理镜像，不在服务器本地构建前端或 Docker 镜像。
+本文档适用于仓库位于 `/projects/we-mp-rss` 的单机 Ubuntu 部署，默认在服务器基于本地源码构建 Docker 镜像，并通过国内代理镜像源拉取基础镜像。
 
 ## 架构
 
 - Nginx 对外提供 `80/443`
 - 应用容器监听 `127.0.0.1:8001`
 - 默认使用项目原生 SQLite，数据库文件保存在 `runtime/data`
-- 应用镜像默认使用 `docker.1ms.run/rachelos/we-mp-rss:latest`
+- 应用镜像默认构建为本地标签 `we-mp-rss:local`
 
 ## 前置条件
 
@@ -16,6 +16,28 @@
 3. 域名已解析到云主机
 4. 仓库路径固定为 `/projects/we-mp-rss`
 5. 不额外配置 MySQL，保持项目默认 SQLite
+
+## Docker 国内镜像源
+
+项目 Dockerfile 已默认使用以下代理域名：
+
+- Docker Hub: `docker.1ms.run`
+- GHCR: `ghcr.1ms.run`
+- NPM: `https://registry.npmmirror.com`
+
+建议同时为 Docker daemon 配置镜像加速，避免 `docker build` 时回退到官方源：
+
+```bash
+sudo mkdir -p /etc/docker
+sudo tee /etc/docker/daemon.json >/dev/null <<'EOF'
+{
+  "registry-mirrors": [
+    "https://docker.1ms.run"
+  ]
+}
+EOF
+sudo systemctl restart docker
+```
 
 ## 安装运行时
 
@@ -51,9 +73,12 @@ cp deploy/.env.example deploy/.env.prod
 - `ADMIN_PASSWORD`
 - `SECRET_KEY`
 
-默认镜像地址已经配置为国内代理：
+默认已经配置本地构建和国内代理参数：
 
-- `WERSS_IMAGE=docker.1ms.run/rachelos/we-mp-rss:latest`
+- `WERSS_LOCAL_IMAGE=we-mp-rss:local`
+- `DOCKERHUB_MIRROR=docker.1ms.run`
+- `GHCR_MIRROR=ghcr.1ms.run`
+- `NPM_REGISTRY=https://registry.npmmirror.com`
 
 3. 执行部署
 
@@ -65,10 +90,10 @@ chmod +x deploy/*.sh
 
 部署脚本执行的是：
 
-- `docker compose pull`
+- `docker compose build --pull app`
 - `docker compose up -d`
 
-不会在服务器本地构建前端，也不会拉取 `node:20`。
+会在服务器本地构建前端和应用镜像，但默认会通过代理地址拉取 `node:20` 与运行时基础镜像。
 
 4. 检查应用
 
@@ -129,13 +154,14 @@ cd /projects/we-mp-rss
 
 ### 国内云主机拉镜像慢或失败
 
-先单独测试代理镜像：
+先单独测试代理基础镜像：
 
 ```bash
-docker pull docker.1ms.run/rachelos/we-mp-rss:latest
+docker pull docker.1ms.run/library/node:20
+docker pull ghcr.1ms.run/rachelos/base-full:latest
 ```
 
-如果代理镜像可拉取，`./deploy/deploy.sh` 就不需要本地构建。
+如果代理基础镜像可拉取，`./deploy/deploy.sh` 就可以直接本地构建。
 
 ### 管理员账号没有变化
 
@@ -160,4 +186,16 @@ docker compose --env-file .env.prod -f docker-compose.prod.yml logs -f app
 
 ## 可选方案
 
-如果你的服务器能稳定访问 Docker Hub 和 GitHub Container Registry，且你确实需要基于本地源码自定义构建，再使用 `deploy/build-frontend.sh` 和项目根目录 Dockerfile。国内云主机默认不推荐这条路径。
+如果你的服务器可以稳定访问官方源，也可以在 `deploy/.env.prod` 中覆盖：
+
+- `DOCKERHUB_MIRROR`
+- `GHCR_MIRROR`
+- `NPM_REGISTRY`
+
+例如改回官方源：
+
+```bash
+DOCKERHUB_MIRROR=docker.io
+GHCR_MIRROR=ghcr.io
+NPM_REGISTRY=https://registry.npmjs.org
+```
