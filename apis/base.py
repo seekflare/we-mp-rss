@@ -1,13 +1,12 @@
 from fastapi import status
 from pydantic import BaseModel
-from typing import Generic, TypeVar, Optional
-
-T = TypeVar('T')
+from typing import Any, Optional
 
 class BaseResponse(BaseModel):
     code: int = 0
     message: str = "success"
-    data: Optional[T] = None
+    # Avoid unresolved TypeVar schema generation errors under Pydantic v2.
+    data: Optional[Any] = None
 
 def success_response(data=None, message="success"):
     return {
