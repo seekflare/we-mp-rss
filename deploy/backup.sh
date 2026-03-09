@@ -20,10 +20,6 @@ if [[ -d "${PROJECT_ROOT}/runtime/data" ]]; then
   tar -czf "${TARGET_DIR}/data.tar.gz" -C "${PROJECT_ROOT}/runtime" data
 fi
 
-docker compose --env-file "${ENV_FILE}" -f "${COMPOSE_FILE}" exec -T mysql \
-  sh -lc 'exec mysqldump -urss_user -p"$MYSQL_PASSWORD" --single-transaction --quick we_mp_rss' \
-  > "${TARGET_DIR}/we_mp_rss.sql"
-
 cp "${COMPOSE_FILE}" "${TARGET_DIR}/docker-compose.prod.yml"
 cp "${SCRIPT_DIR}/nginx.we-mp-rss.conf" "${TARGET_DIR}/nginx.we-mp-rss.conf"
 cp "${ENV_FILE}" "${TARGET_DIR}/.env.prod"

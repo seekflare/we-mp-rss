@@ -1,23 +1,4 @@
 services:
-  mysql:
-    image: mysql:8.3.0
-    container_name: we-mp-rss-mysql
-    restart: unless-stopped
-    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
-    environment:
-      TZ: ${TZ}
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: we_mp_rss
-      MYSQL_USER: rss_user
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
-    volumes:
-      - ${PROJECT_ROOT}/runtime/mysql:/var/lib/mysql
-    healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-
   app:
     build:
       context: ${PROJECT_ROOT}
@@ -25,14 +6,10 @@ services:
     image: we-mp-rss:prod
     container_name: we-mp-rss-app
     restart: unless-stopped
-    depends_on:
-      mysql:
-        condition: service_healthy
     ports:
       - "127.0.0.1:8001:8001"
     environment:
       TZ: ${TZ}
-      DB: mysql+pymysql://rss_user:${MYSQL_PASSWORD}@mysql/we_mp_rss?charset=utf8mb4
       USERNAME: ${ADMIN_USERNAME}
       PASSWORD: ${ADMIN_PASSWORD}
       SECRET_KEY: ${SECRET_KEY}

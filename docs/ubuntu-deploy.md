@@ -6,7 +6,7 @@
 
 - Nginx 对外提供 `80/443`
 - 应用容器监听 `127.0.0.1:8001`
-- MySQL 容器仅在 Docker 网络内访问
+- 默认使用项目原生 SQLite，数据库文件保存在 `runtime/data`
 - 前端生产构建产物复制到仓库根目录 `static/`
 
 ## 前置条件
@@ -15,6 +15,7 @@
 2. 云安全组只开放 `22/80/443`
 3. 域名已解析到云主机
 4. 仓库路径固定为 `/projects/we-mp-rss`
+5. 不额外配置 MySQL，保持项目默认 SQLite
 
 ## 安装运行时
 
@@ -35,7 +36,6 @@ sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin d
 
 ```bash
 mkdir -p /projects/we-mp-rss/runtime/data
-mkdir -p /projects/we-mp-rss/runtime/mysql
 ```
 
 2. 准备环境变量
@@ -49,8 +49,6 @@ cp deploy/.env.example deploy/.env.prod
 
 - `DOMAIN`
 - `ADMIN_PASSWORD`
-- `MYSQL_ROOT_PASSWORD`
-- `MYSQL_PASSWORD`
 - `SECRET_KEY`
 
 3. 执行部署
@@ -117,7 +115,7 @@ cd /projects/we-mp-rss
 备份内容：
 
 - `runtime/data` 压缩包
-- MySQL 逻辑导出 `we_mp_rss.sql`
+- 其中包含 SQLite 数据库文件与运行时缓存
 - 当前部署配置副本
 
 ## 常见问题
@@ -134,6 +132,10 @@ cd /projects/we-mp-rss
 ### 管理员账号没有变化
 
 管理员账号只在空库首次初始化时生效。已经有数据后，修改 `.env.prod` 不会覆盖现有账号。
+
+### SQLite 数据库文件在哪
+
+默认数据库文件位于 `/projects/we-mp-rss/runtime/data/db.db`。只要保留 `runtime/data`，数据库就会持久化。
 
 ### 8001 端口无法访问
 
