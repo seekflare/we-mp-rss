@@ -23,6 +23,6 @@ services:
       THREADS: "1"
       WERSS_AUTH_WEB: "True"
       BROWSER_TYPE: webkit
-      RSS_BASE_URL: https://${DOMAIN}
+      RSS_BASE_URL: ${RSS_SCHEME:-https}://${DOMAIN}/
     volumes:
       - ${PROJECT_ROOT}/runtime/data:/app/data

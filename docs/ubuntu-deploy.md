@@ -1,25 +1,37 @@
 # Ubuntu 部署指南
 
-本文档适用于仓库位于 `/projects/we-mp-rss` 的单机 Ubuntu 部署，默认在服务器基于本地源码构建 Docker 镜像，并通过国内代理镜像源拉取基础镜像。
+本文档适用于仓库位于 `/projects/we-mp-rss` 的单机 Ubuntu 部署。默认在服务器基于本地源码构建 Docker 镜像，并通过国内代理镜像源拉取基础镜像。
+
+支持两种访问模式：
+
+- 域名模式：`https://your-domain`，适合长期公网访问
+- IP 模式：`http://<public-ip>`，适合个人使用或不想处理备案/证书的场景
+
+如果你已经按域名模式上线，后续想回退到 IP 访问，请直接看 `docs/domain-to-ip-access.md`。
 
 ## 架构
 
-- Nginx 对外提供 `80/443`
+- Nginx 对外提供 `80`，域名模式可额外提供 `443`
 - 应用容器监听 `127.0.0.1:8001`
 - 默认使用项目原生 SQLite，数据库文件保存在 `runtime/data`
 - 应用镜像默认构建为本地标签 `we-mp-rss:local`
+- RSS 绝对地址由 `RSS_SCHEME` 和 `DOMAIN` 共同生成，格式为 `${RSS_SCHEME}://${DOMAIN}/`
 
 ## 前置条件
 
 1. Ubuntu 22.04 或 24.04 LTS
-2. 云安全组只开放 `22/80/443`
-3. 域名已解析到云主机
-4. 仓库路径固定为 `/projects/we-mp-rss`
-5. 不额外配置 MySQL，保持项目默认 SQLite
+2. 仓库路径固定为 `/projects/we-mp-rss`
+3. 不额外配置 MySQL，保持项目默认 SQLite
+4. 根据访问模式准备网络入口：
+   - IP 模式：云安全组开放 `22/80`
+   - 域名模式：云安全组开放 `22/80/443`
+5. 根据访问模式准备入口：
+   - IP 模式：服务器已绑定固定公网 IP
+   - 域名模式：域名已解析到当前云主机
 
 ## Docker 国内镜像源
 
-项目 Dockerfile 已默认使用以下代理域名：
+项目 Dockerfile 已默认使用以下代理地址：
 
 - Docker Hub: `docker.1ms.run`
 - GHCR: `ghcr.1ms.run`
@@ -54,13 +66,13 @@ sudo apt install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin d
 
 ## 首次部署
 
-1. 创建运行目录
+### 1. 创建运行目录
 
 ```bash
 mkdir -p /projects/we-mp-rss/runtime/data
 ```
 
-2. 准备环境变量
+### 2. 准备环境变量
 
 ```bash
 cd /projects/we-mp-rss
@@ -70,8 +82,27 @@ cp deploy/.env.example deploy/.env.prod
 编辑 `deploy/.env.prod`，至少修改：
 
 - `DOMAIN`
+- `RSS_SCHEME`
 - `ADMIN_PASSWORD`
 - `SECRET_KEY`
+
+填写规则：
+
+- `DOMAIN` 只填域名或公网 IP，不要带 `http://` 或 `https://`
+- 域名模式：`RSS_SCHEME=https`
+- IP 模式：`RSS_SCHEME=http`
+
+例如：
+
+```dotenv
+# 域名模式
+DOMAIN=we-rss.xyz
+RSS_SCHEME=https
+
+# IP 模式
+DOMAIN=1.2.3.4
+RSS_SCHEME=http
+```
 
 默认已经配置本地构建和国内代理参数：
 
@@ -80,7 +111,7 @@ cp deploy/.env.example deploy/.env.prod
 - `GHCR_MIRROR=ghcr.1ms.run`
 - `NPM_REGISTRY=https://registry.npmmirror.com`
 
-3. 执行部署
+### 3. 执行部署
 
 ```bash
 cd /projects/we-mp-rss
@@ -93,28 +124,35 @@ chmod +x deploy/*.sh
 - `docker compose build --pull app`
 - `docker compose up -d`
 
-会在服务器本地构建前端和应用镜像，但默认会通过代理地址拉取 `node:20` 与运行时基础镜像。
+会在服务器本地构建前端和应用镜像，并通过代理地址拉取 `node:20` 与运行时基础镜像。
 
-4. 检查应用
+### 4. 检查应用
 
 ```bash
 cd /projects/we-mp-rss/deploy
 docker compose --env-file .env.prod -f docker-compose.prod.yml ps
 docker compose --env-file .env.prod -f docker-compose.prod.yml logs -f app
+docker compose --env-file .env.prod -f docker-compose.prod.yml exec app env | grep RSS_BASE_URL
 curl http://127.0.0.1:8001/api/openapi.json
 ```
 
+预期：
+
+- 容器状态为 `Up`
+- `RSS_BASE_URL` 形如 `https://your-domain/` 或 `http://<public-ip>/`
+- 本机 `127.0.0.1:8001` 可访问 OpenAPI
+
 ## Nginx 反向代理
 
-1. 复制模板
+### 域名模式
+
+复制域名模板：
 
 ```bash
 sudo cp /projects/we-mp-rss/deploy/nginx.we-mp-rss.conf /etc/nginx/sites-available/we-mp-rss.conf
 ```
 
-2. 将其中的 `server_name rss.example.com;` 改成你的域名
-
-3. 启用站点
+将其中的 `server_name rss.example.com;` 改成你的域名，然后启用站点：
 
 ```bash
 sudo ln -sf /etc/nginx/sites-available/we-mp-rss.conf /etc/nginx/sites-enabled/we-mp-rss.conf
@@ -123,11 +161,56 @@ sudo systemctl enable --now nginx
 sudo systemctl reload nginx
 ```
 
+### IP 模式
+
+复制 IP 专用模板：
+
+```bash
+sudo cp /projects/we-mp-rss/deploy/nginx.we-mp-rss.ip.conf /etc/nginx/sites-available/we-mp-rss.conf
+sudo ln -sf /etc/nginx/sites-available/we-mp-rss.conf /etc/nginx/sites-enabled/we-mp-rss.conf
+sudo rm -f /etc/nginx/sites-enabled/default
+sudo nginx -t
+sudo systemctl enable --now nginx
+sudo systemctl reload nginx
+```
+
+这个模板会直接以 `80 default_server` 对外提供 `http://<public-ip>/`。
+
 ## HTTPS
+
+仅域名模式需要执行：
 
 ```bash
 sudo certbot --nginx -d your-domain.example.com
 ```
+
+如果只使用 IP 访问，跳过此步骤。
+
+## 验证
+
+### 域名模式
+
+```bash
+curl -I http://your-domain.example.com
+curl -I https://your-domain.example.com
+curl https://your-domain.example.com/api/openapi.json
+curl https://your-domain.example.com/rss
+```
+
+### IP 模式
+
+```bash
+curl -I http://<public-ip>/
+curl http://<public-ip>/api/openapi.json
+curl http://<public-ip>/rss
+ss -lntp | grep -E ':80|:443|:8001'
+```
+
+IP 模式下建议看到：
+
+- `80` 正常监听
+- `8001` 只绑定 `127.0.0.1:8001`
+- 不再强制跳转 `https`
 
 ## 升级
 
@@ -135,6 +218,14 @@ sudo certbot --nginx -d your-domain.example.com
 cd /projects/we-mp-rss
 git pull
 ./deploy/deploy.sh
+```
+
+如果你使用 IP 模式，升级后建议额外确认：
+
+```bash
+grep '^RSS_SCHEME=' /projects/we-mp-rss/deploy/.env.prod
+cd /projects/we-mp-rss/deploy
+docker compose --env-file .env.prod -f docker-compose.prod.yml exec app env | grep RSS_BASE_URL
 ```
 
 ## 备份
@@ -147,7 +238,8 @@ cd /projects/we-mp-rss
 备份内容：
 
 - `runtime/data` 压缩包
-- 其中包含 SQLite 数据库文件与运行时缓存
+- `docker-compose.prod.yml`
+- 域名模板和 IP 模板
 - 当前部署配置副本
 
 ## 常见问题
@@ -171,9 +263,24 @@ docker pull ghcr.1ms.run/rachelos/base-full:latest
 
 默认数据库文件位于 `/projects/we-mp-rss/runtime/data/db.db`。只要保留 `runtime/data`，数据库就会持久化。
 
-### 8001 端口无法访问
+### 8001 端口无法从公网访问
 
-该方案故意只绑定 `127.0.0.1:8001`。公网应通过 Nginx 的 `80/443` 访问。
+该方案故意只绑定 `127.0.0.1:8001`。公网应通过 Nginx 的 `80` 或 `80/443` 访问。
+
+### 页面能打开，但 RSS 或 OPML 里的链接不对
+
+优先检查：
+
+- `DOMAIN` 是否填成了带协议的值
+- `RSS_SCHEME` 是否和当前访问方式一致
+- `RSS_BASE_URL` 是否已经生效并带结尾 `/`
+
+确认命令：
+
+```bash
+cd /projects/we-mp-rss/deploy
+docker compose --env-file .env.prod -f docker-compose.prod.yml exec app env | grep RSS_BASE_URL
+```
 
 ### 浏览器采集异常
 

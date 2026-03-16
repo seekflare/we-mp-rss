@@ -22,6 +22,7 @@ fi
 
 cp "${COMPOSE_FILE}" "${TARGET_DIR}/docker-compose.prod.yml"
 cp "${SCRIPT_DIR}/nginx.we-mp-rss.conf" "${TARGET_DIR}/nginx.we-mp-rss.conf"
+cp "${SCRIPT_DIR}/nginx.we-mp-rss.ip.conf" "${TARGET_DIR}/nginx.we-mp-rss.ip.conf"
 cp "${ENV_FILE}" "${TARGET_DIR}/.env.prod"
 
 echo "backup created: ${TARGET_DIR}"
